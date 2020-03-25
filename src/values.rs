@@ -71,10 +71,8 @@ impl<T, S> Values<T, S> {
         }
     }
     
-    /// An iterator visiting all elements in arbitrary order.
-    ///
-    /// The iterator element type is &'a T.
-    pub fn single(&self) -> Option<&T> {
+    /// Returns the first element.
+    pub fn get_first(&self) -> Option<&T> {
         match self.0 {
             ValuesInner::Short(ref v) => v.get(0),
             ValuesInner::Long(ref v) => v.iter().next(),

@@ -265,12 +265,12 @@ where
     /// refreshed by the writer. If no refresh has happened, or the map has been destroyed, this
     /// function returns `None`.
     #[inline]
-    pub fn single<'rh, Q: ?Sized>(&'rh self, key: &'_ Q) -> Option<ReadGuard<'rh, V>>
+    pub fn get_first<'rh, Q: ?Sized>(&'rh self, key: &'_ Q) -> Option<ReadGuard<'rh, V>>
         where
             K: Borrow<Q>,
             Q: Hash + Eq,
     {
-        self.get_raw(key.borrow())?.map_opt(|x| x.user_friendly().single())
+        self.get_raw(key.borrow())?.map_opt(|x| x.user_friendly().get_first())
     }
 
     /// Returns a guarded reference to the values corresponding to the key along with the map
