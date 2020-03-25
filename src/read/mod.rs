@@ -120,6 +120,7 @@ where
 impl<K, V, M, S> ReadHandle<K, V, M, S>
 where
     K: Eq + Hash,
+    V: Eq + Hash,
     S: BuildHasher,
     M: Clone,
 {
@@ -199,20 +200,20 @@ where
     /// While the reference lives, the map cannot be refreshed.
     ///
     /// See [`MapReadRef`].
-    pub fn read(&self) -> MapReadRef<'_, K, V, M, S> {
-        MapReadRef {
-            guard: self.handle(),
-        }
+    pub fn read(&self) -> Option<MapReadRef<'_, K, V, M, S>> {
+        Some(MapReadRef {
+            guard: self.handle()?,
+        })
     }
 
     /// Returns the number of non-empty keys present in the map.
     pub fn len(&self) -> usize {
-        self.read().len()
+        self.read().map_or(0, |x| x.len())
     }
 
     /// Returns true if the map contains no elements.
     pub fn is_empty(&self) -> bool {
-        self.read().is_empty()
+        self.read().map_or(true, |x| x.is_empty())
     }
 
     /// Get the current meta value.
@@ -253,6 +254,25 @@ where
         Some(self.get_raw(key.borrow())?.map_ref(Values::user_friendly))
     }
 
+    /// Returns a guarded reference to the first value corresponding to the key.
+    ///
+    /// While the guard lives, the map cannot be refreshed.
+    ///
+    /// The key may be any borrowed form of the map's key type, but `Hash` and `Eq` on the borrowed
+    /// form must match those for the key type.
+    ///
+    /// Note that not all writes will be included with this read -- only those that have been
+    /// refreshed by the writer. If no refresh has happened, or the map has been destroyed, this
+    /// function returns `None`.
+    #[inline]
+    pub fn single<'rh, Q: ?Sized>(&'rh self, key: &'_ Q) -> Option<ReadGuard<'rh, V>>
+        where
+            K: Borrow<Q>,
+            Q: Hash + Eq,
+    {
+        self.get_raw(key.borrow())?.map_opt(|x| x.user_friendly().single())
+    }
+
     /// Returns a guarded reference to the values corresponding to the key along with the map
     /// meta.
     ///
@@ -286,7 +306,7 @@ where
     ///
     /// See [`WriteHandle::destroy`].
     pub fn is_destroyed(&self) -> bool {
-        self.read().is_destroyed()
+        self.handle().is_none()
     }
 
     /// Returns true if the map contains any values for the specified key.
@@ -298,7 +318,21 @@ where
         K: Borrow<Q>,
         Q: Hash + Eq,
     {
-        self.read().contains_key(key)
+        self.read().map_or(false, |x| x.contains_key(key))
+    }
+
+    /// Returns true if the map contains the specified value for the specified key.
+    ///
+    /// The key and value may be any borrowed form of the map's respective types, but `Hash` and `Eq` on the borrowed
+    /// form *must* match.
+    pub fn contains_value<Q: ?Sized, W: ?Sized>(&self, key: &Q, value: &W) -> bool
+        where
+            K: Borrow<Q>,
+            V: Borrow<W>,
+            Q: Hash + Eq,
+            W: Hash + Eq,
+    {
+        self.get_raw(key.borrow()).map(|x| x.user_friendly().contains(value)).unwrap_or_default()
     }
 
     /// Read all values in the map, and transform them into a new collection.
@@ -307,7 +341,7 @@ where
         Map: FnMut(&K, &Values<V, S>) -> Target,
         Collector: FromIterator<Target>,
     {
-        Collector::from_iter(self.read().iter().map(|(k, v)| f(k, v)))
+        Collector::from_iter(self.read().iter().flatten().map(|(k, v)| f(k, v)))
     }
 }
 

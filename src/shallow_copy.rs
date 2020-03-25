@@ -65,6 +65,15 @@ where
     }
 }
 
+impl<T> ShallowCopy for Option<T>
+where
+    T: ShallowCopy
+{
+    unsafe fn shallow_copy(&self) -> ManuallyDrop<Self> {
+        ManuallyDrop::new(if let Some(value) = self { Some(ManuallyDrop::into_inner(value.shallow_copy())) } else { None })
+    }
+}
+
 impl ShallowCopy for String {
     unsafe fn shallow_copy(&self) -> ManuallyDrop<Self> {
         let buf = self.as_bytes().as_ptr();
@@ -106,7 +115,7 @@ where
 ///
 /// This is effectively a way to bypass the `ShallowCopy` optimization.
 /// Note that you do not need this wrapper for most `Copy` primitives.
-#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Default)]
 #[repr(transparent)]
 pub struct CopyValue<T>(T);
 
