@@ -51,11 +51,11 @@ fn fields(data: &Data, type_name: &Ident) -> TokenStream {
                         }
                     });
                     quote! {
-                        std::mem::ManuallyDrop::new((#(#recurse,)*))
+                        std::mem::ManuallyDrop::new(#type_name(#(#recurse,)*))
                     }
                 }
                 Fields::Unit => {
-                    quote!(())
+                    quote!(std::mem::ManuallyDrop::new(#type_name))
                 }
             }
         }
@@ -63,7 +63,7 @@ fn fields(data: &Data, type_name: &Ident) -> TokenStream {
             let recurse = data.variants.iter().map(|f| {
                 let (names, fields) = match &f.fields {
                     Fields::Named(fields) => {
-                        let field_names = f.fields.iter().enumerate().map(|(i, field)| {
+                        let field_names = f.fields.iter().map(|field| {
                             let ident = field.ident.as_ref().unwrap();
                             quote_spanned! {
                                 field.span()=> #ident

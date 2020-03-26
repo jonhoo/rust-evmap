@@ -1,5 +1,6 @@
 use evmap_derive::ShallowCopy;
 use std::sync::Arc;
+use evmap::shallow_copy::ShallowCopy as _;
 
 #[derive(ShallowCopy)]
 enum Message {
@@ -9,13 +10,11 @@ enum Message {
 	Write(String)
 }
 
+#[derive(ShallowCopy)]
 struct Shallow;
 
-impl evmap::ShallowCopy for Shallow {
-	unsafe fn shallow_copy(&self) ->  std::mem::ManuallyDrop<Self> {
-		unimplemented!();
-	}
-}
+#[derive(ShallowCopy)]
+struct Tuple(i32, String, Shallow);
 
 #[derive(ShallowCopy)]
 struct Test {
@@ -25,4 +24,33 @@ struct Test {
 	f4: Arc<String>,
 	f5: Shallow,
 	f6: evmap::shallow_copy::CopyValue<i32>,
+	f7: Tuple,
+}
+
+#[test]
+fn test() {
+	unsafe {
+		let message = Message::Quit;
+		message.shallow_copy();
+		let shallow = Shallow;
+		shallow.shallow_copy();
+		let tuple = Tuple(0, "test".to_owned(), Shallow);
+		tuple.shallow_copy();
+		let test = Test {
+			f1: 0,
+			f2: (1, 2),
+			f3: "test".to_owned(),
+			f4: Arc::new("test".to_owned()),
+			f5: shallow,
+			f6: 3.into(),
+			f7: tuple
+		};
+		test.shallow_copy();
+	}
+}
+
+#[test]
+fn failing() {
+	let t = trybuild::TestCases::new();
+	t.compile_fail("tests/failing/lib.rs");
 }

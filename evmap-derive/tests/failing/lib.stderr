@@ -1,0 +1,15 @@
+error[E0277]: the trait bound `std::cell::Cell<()>: evmap::shallow_copy::ShallowCopy` is not satisfied
+ --> $DIR/lib.rs:6:2
+  |
+6 |     f2: std::cell::Cell<()>,
+  |     ^^ the trait `evmap::shallow_copy::ShallowCopy` is not implemented for `std::cell::Cell<()>`
+  |
+  = note: required by `evmap::shallow_copy::ShallowCopy::shallow_copy`
+
+error[E0277]: the trait bound `std::cell::Cell<()>: evmap::shallow_copy::ShallowCopy` is not satisfied
+ --> $DIR/lib.rs:9:10
+  |
+9 | #[derive(ShallowCopy)]
+  |          ^^^^^^^^^^^ the trait `evmap::shallow_copy::ShallowCopy` is not implemented for `std::cell::Cell<()>`
+  |
+  = note: required by `evmap::shallow_copy::ShallowCopy::shallow_copy`

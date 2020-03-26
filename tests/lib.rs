@@ -80,7 +80,7 @@ fn mapref() {
     // get a read ref to the map
     // scope to ensure it gets dropped and doesn't stall refresh
     {
-        let map = r.read().unwrap();
+        let map = r.read().expect("the map has not been destroyed");
         // the map is uninitialized, so all lookups should return None
         assert!(map.is_empty());
         assert!(!map.contains_key(&x.0));
@@ -156,7 +156,7 @@ fn mapref() {
     drop(w);
     {
         let map = r.read();
-        assert!(map.is_none());
+        assert!(map.is_none(), "the map should have been destroyed");
     }
 }
 
