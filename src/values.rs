@@ -71,8 +71,10 @@ impl<T, S> Values<T, S> {
         }
     }
     
-    /// Returns the first element.
-    pub fn get_first(&self) -> Option<&T> {
+    /// Returns a guarded reference to _one_ value corresponding to the key.
+    /// This is mostly intended for use when you are working with no more than one value per key.
+    /// If there are multiple values stored for this key, there are no guarantees to which element is returned.
+    pub fn get_one(&self) -> Option<&T> {
         match self.0 {
             ValuesInner::Short(ref v) => v.get(0),
             ValuesInner::Long(ref v) => v.iter().next(),

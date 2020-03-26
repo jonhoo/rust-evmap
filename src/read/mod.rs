@@ -254,7 +254,9 @@ where
         Some(self.get_raw(key.borrow())?.map_ref(Values::user_friendly))
     }
 
-    /// Returns a guarded reference to the first value corresponding to the key.
+    /// Returns a guarded reference to _one_ value corresponding to the key.
+    /// This is mostly intended for use when you are working with no more than one value per key.
+    /// If there are multiple values stored for this key, there are no guarantees to which element is returned.
     ///
     /// While the guard lives, the map cannot be refreshed.
     ///
@@ -265,12 +267,12 @@ where
     /// refreshed by the writer. If no refresh has happened, or the map has been destroyed, this
     /// function returns `None`.
     #[inline]
-    pub fn get_first<'rh, Q: ?Sized>(&'rh self, key: &'_ Q) -> Option<ReadGuard<'rh, V>>
+    pub fn get_one<'rh, Q: ?Sized>(&'rh self, key: &'_ Q) -> Option<ReadGuard<'rh, V>>
         where
             K: Borrow<Q>,
             Q: Hash + Eq,
     {
-        self.get_raw(key.borrow())?.map_opt(|x| x.user_friendly().get_first())
+        self.get_raw(key.borrow())?.map_opt(|x| x.user_friendly().get_one())
     }
 
     /// Returns a guarded reference to the values corresponding to the key along with the map

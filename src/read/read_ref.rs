@@ -70,7 +70,9 @@ where
         self.guard.data.get(key).map(Values::user_friendly)
     }
     
-    /// Returns a reference to the first value corresponding to the key.
+    /// Returns a guarded reference to _one_ value corresponding to the key.
+    /// This is mostly intended for use when you are working with no more than one value per key.
+    /// If there are multiple values stored for this key, there are no guarantees to which element is returned.
     ///
     /// The key may be any borrowed form of the map's key type, but `Hash` and `Eq` on the borrowed
     /// form *must* match those for the key type.
@@ -78,12 +80,12 @@ where
     /// Note that not all writes will be included with this read -- only those that have been
     /// refreshed by the writer. If no refresh has happened, or the map has been destroyed, this
     /// function returns `None`.
-    pub fn get_first<Q: ?Sized>(&'rh self, key: &'_ Q) -> Option<&'rh V>
+    pub fn get_one<Q: ?Sized>(&'rh self, key: &'_ Q) -> Option<&'rh V>
         where
             K: Borrow<Q>,
             Q: Hash + Eq,
     {
-        self.guard.data.get(key).and_then(|values| values.user_friendly().get_first())
+        self.guard.data.get(key).and_then(|values| values.user_friendly().get_one())
     }
 
     /// Returns true if the map contains any values for the specified key.
