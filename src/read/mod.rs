@@ -255,6 +255,7 @@ where
     }
 
     /// Returns a guarded reference to _one_ value corresponding to the key.
+    ///
     /// This is mostly intended for use when you are working with no more than one value per key.
     /// If there are multiple values stored for this key, there are no guarantees to which element is returned.
     ///

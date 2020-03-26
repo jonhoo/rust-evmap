@@ -61,21 +61,44 @@ fn fields(data: &Data, type_name: &Ident) -> TokenStream {
         }
         Data::Enum(data) => {
             let recurse = data.variants.iter().map(|f| {
-                let field_names = f.fields.iter().enumerate().map(|(i, field)| {
-                    let ident = format_ident!("x{}", i);
-                    quote_spanned! {
-                        field.span()=> #ident
+                let (names, fields) = match &f.fields {
+                    Fields::Named(fields) => {
+                        let field_names = f.fields.iter().enumerate().map(|(i, field)| {
+                            let ident = field.ident.as_ref().unwrap();
+                            quote_spanned! {
+                                field.span()=> #ident
+                            }
+                        });
+                        let recurse = fields.named.iter().map(|f| {
+                            let name = f.ident.as_ref().unwrap();
+                            quote_spanned! {f.span()=>
+                                #name: std::mem::ManuallyDrop::into_inner(evmap::shallow_copy::ShallowCopy::shallow_copy(#name))
+                            }
+                        });
+                        (quote! { {#(#field_names,)*} }, quote! { { #(#recurse,)* } })
                     }
-                });
-                let fields = f.fields.iter().enumerate().map(|(i, field)| {
-                    let ident = format_ident!("x{}", i);
-                    quote_spanned! {field.span()=>
-                       std::mem::ManuallyDrop::into_inner(evmap::shallow_copy::ShallowCopy::shallow_copy(#ident))
+                    Fields::Unnamed(fields) => {
+                        let field_names = f.fields.iter().enumerate().map(|(i, field)| {
+                            let ident = format_ident!("x{}", i);
+                            quote_spanned! {
+                                field.span()=> #ident
+                            }
+                        });
+                        let recurse = fields.unnamed.iter().enumerate().map(|(i, f)| {
+                            let ident = format_ident!("x{}", i);
+                            quote_spanned! {f.span()=>
+                                std::mem::ManuallyDrop::into_inner(evmap::shallow_copy::ShallowCopy::shallow_copy(#ident))
+                            }
+                        });
+                        (quote! { (#(#field_names,)*) }, quote! { (#(#recurse,)*) })
                     }
-                });
+                    Fields::Unit => {
+                        (quote!(), quote!())
+                    }
+                };
                 let name = &f.ident;
                 quote_spanned! {f.span()=>
-                    #type_name::#name(#(#field_names,)*) => std::mem::ManuallyDrop::new(#type_name::#name(#(#fields,)*))
+                    #type_name::#name#names => std::mem::ManuallyDrop::new(#type_name::#name#fields)
                 }
             });
             quote! {
