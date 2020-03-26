@@ -1,7 +1,7 @@
+use crate::values::{Values, ValuesIter};
 use std::mem;
 use std::sync;
 use std::sync::atomic;
-use crate::values::{Values, ValuesIter};
 
 /// A guard wrapping a live reference into an evmap.
 ///

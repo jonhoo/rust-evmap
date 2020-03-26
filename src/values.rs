@@ -70,7 +70,7 @@ impl<T, S> Values<T, S> {
             ValuesInner::Long(ref v) => ValuesIter::Long(v.iter()),
         }
     }
-    
+
     /// Returns a guarded reference to _one_ value corresponding to the key.
     ///
     /// This is mostly intended for use when you are working with no more than one value per key.

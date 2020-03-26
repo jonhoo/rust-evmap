@@ -67,10 +67,14 @@ where
 
 impl<T> ShallowCopy for Option<T>
 where
-    T: ShallowCopy
+    T: ShallowCopy,
 {
     unsafe fn shallow_copy(&self) -> ManuallyDrop<Self> {
-        ManuallyDrop::new(if let Some(value) = self { Some(ManuallyDrop::into_inner(value.shallow_copy())) } else { None })
+        ManuallyDrop::new(if let Some(value) = self {
+            Some(ManuallyDrop::into_inner(value.shallow_copy()))
+        } else {
+            None
+        })
     }
 }
 

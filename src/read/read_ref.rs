@@ -2,9 +2,9 @@ use super::ReadGuard;
 use crate::{inner::Inner, values::Values};
 
 use std::borrow::Borrow;
+use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hash};
 use std::mem::ManuallyDrop;
-use std::collections::hash_map::RandomState;
 
 /// A live reference into the read half of an evmap.
 ///
@@ -69,7 +69,7 @@ where
     {
         self.guard.data.get(key).map(Values::user_friendly)
     }
-    
+
     /// Returns a guarded reference to _one_ value corresponding to the key.
     ///
     /// This is mostly intended for use when you are working with no more than one value per key.
@@ -82,11 +82,14 @@ where
     /// refreshed by the writer. If no refresh has happened, or the map has been destroyed, this
     /// function returns `None`.
     pub fn get_one<Q: ?Sized>(&'rh self, key: &'_ Q) -> Option<&'rh V>
-        where
-            K: Borrow<Q>,
-            Q: Hash + Eq,
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq,
     {
-        self.guard.data.get(key).and_then(|values| values.user_friendly().get_one())
+        self.guard
+            .data
+            .get(key)
+            .and_then(|values| values.user_friendly().get_one())
     }
 
     /// Returns true if the map contains any values for the specified key.
@@ -106,13 +109,16 @@ where
     /// The key and value may be any borrowed form of the map's respective types, but `Hash` and `Eq` on the borrowed
     /// form *must* match.
     pub fn contains_value<Q: ?Sized, W: ?Sized>(&self, key: &Q, value: &W) -> bool
-        where
-            K: Borrow<Q>,
-            V: Borrow<W>,
-            Q: Hash + Eq,
-            W: Hash + Eq,
+    where
+        K: Borrow<Q>,
+        V: Borrow<W>,
+        Q: Hash + Eq,
+        W: Hash + Eq,
     {
-        self.guard.data.get(key).map_or(false, |values| values.user_friendly().contains(value))
+        self.guard
+            .data
+            .get(key)
+            .map_or(false, |values| values.user_friendly().contains(value))
     }
 }
 

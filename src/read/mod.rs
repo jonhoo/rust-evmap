@@ -269,11 +269,12 @@ where
     /// function returns `None`.
     #[inline]
     pub fn get_one<'rh, Q: ?Sized>(&'rh self, key: &'_ Q) -> Option<ReadGuard<'rh, V>>
-        where
-            K: Borrow<Q>,
-            Q: Hash + Eq,
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq,
     {
-        self.get_raw(key.borrow())?.map_opt(|x| x.user_friendly().get_one())
+        self.get_raw(key.borrow())?
+            .map_opt(|x| x.user_friendly().get_one())
     }
 
     /// Returns a guarded reference to the values corresponding to the key along with the map
@@ -329,13 +330,15 @@ where
     /// The key and value may be any borrowed form of the map's respective types, but `Hash` and `Eq` on the borrowed
     /// form *must* match.
     pub fn contains_value<Q: ?Sized, W: ?Sized>(&self, key: &Q, value: &W) -> bool
-        where
-            K: Borrow<Q>,
-            V: Borrow<W>,
-            Q: Hash + Eq,
-            W: Hash + Eq,
+    where
+        K: Borrow<Q>,
+        V: Borrow<W>,
+        Q: Hash + Eq,
+        W: Hash + Eq,
     {
-        self.get_raw(key.borrow()).map(|x| x.user_friendly().contains(value)).unwrap_or_default()
+        self.get_raw(key.borrow())
+            .map(|x| x.user_friendly().contains(value))
+            .unwrap_or_default()
     }
 
     /// Read all values in the map, and transform them into a new collection.

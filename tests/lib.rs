@@ -150,7 +150,7 @@ fn mapref() {
         assert!(map.is_empty());
         assert!(!map.contains_key(&x.0));
         assert!(map.get(&x.0).is_none());
-		assert_eq!(map.meta(), &());
+        assert_eq!(map.meta(), &());
     }
 
     drop(w);
@@ -611,9 +611,7 @@ fn bigbag() {
     let ndistinct = 32;
 
     let jh = thread::spawn(move || loop {
-        let map = if let Some(map) = r.read() { map } else {
-            break
-        };
+        let map = if let Some(map) = r.read() { map } else { break };
         if let Some(rs) = map.get(&1) {
             assert!(rs.len() <= ndistinct * (ndistinct - 1));
             let mut found = true;
