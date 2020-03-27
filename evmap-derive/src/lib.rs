@@ -11,11 +11,11 @@ use syn::{
 
 /// Implementation for `#[derive(ShallowCopy)]`
 ///
-/// evmap provides the [ShallowCopy](evmap::shallow_copy::ShallowCopy) trait, allowing you to cheaply alias types that don't otherwise implement `Copy`.
+/// evmap provides the [`ShallowCopy`](evmap::shallow_copy::ShallowCopy) trait, which allows you to cheaply alias types that don't otherwise implement `Copy`.
 /// Basic implementations are provided for common types such as `String` and `Vec`, but it must be implemented manually for structs using these types.
 ///
 /// This macro attempts to simplify this task. It only works on types whose members all implement `ShallowCopy`.
-/// If this is not possible, consider using [CopyValue](evmap::shallow_copy::CopyValue), `Box`, `Arc` instead.
+/// If this is not possible, consider using [`CopyValue`](evmap::shallow_copy::CopyValue), `Box`, or `Arc` instead.
 ///
 /// ## Usage example
 /// ```
@@ -31,9 +31,10 @@ use syn::{
 /// ```
 ///
 /// ## Generated implementations
-/// For any type, the generated implementation calls [shallow_copy](evmap::shallow_copy::ShallowCopy::shallow_copy), removing the inner `ManuallyDrop` wrappers.
+/// The generated implementation calls [`shallow_copy`](evmap::shallow_copy::ShallowCopy::shallow_copy) on all the members of the type,
+/// and lifts the `ManuallyDrop` wrappers to the top-level return type.
 ///
-/// Given generic types, it will add `ShallowCopy` bounds to all type parameters.
+/// For generic types, the derive adds `ShallowCopy` bounds to all the type parameters.
 ///
 /// For instance, for the following code...
 /// ```
@@ -41,7 +42,7 @@ use syn::{
 /// #[derive(ShallowCopy)]
 /// struct Generic<T> { field: T }
 /// ```
-/// ...this will generate...
+/// ...the derive generates...
 /// ```
 /// # use evmap::shallow_copy::ShallowCopy;
 /// # use std::mem::ManuallyDrop;

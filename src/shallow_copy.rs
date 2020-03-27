@@ -26,6 +26,9 @@ use std::ops::{Deref, DerefMut};
 /// If you have a non-`Copy` type, the value returned by `shallow_copy` should point to the same
 /// data as the `&mut self`, and it should be safe to `mem::forget` either of the copies as long as
 /// the other is dropped normally afterwards.
+///
+/// For structs that exclusively consist of types implementing `ShallowCopy`, consider using the `evmap-derive` crate, which contains a derive macro for `ShallowCopy`.
+/// For more information, consult the documentation for that crate.
 pub trait ShallowCopy {
     /// Perform an aliasing copy of this value.
     ///
