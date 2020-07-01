@@ -748,3 +748,18 @@ fn get_one() {
 
     assert_match!(r.get_one(&x.0).as_deref(), Some(('x', 42)));
 }
+
+#[test]
+fn insert_remove() {
+    let x = 'x';
+
+    let (r, mut w) = evmap::new();
+
+    w.insert(x, x);
+    w.refresh();
+
+    w.remove(x, x);
+    w.refresh();
+
+    assert!(r.is_empty());
+}
