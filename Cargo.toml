@@ -35,7 +35,5 @@ slab = "0.4"
 rand = "0.7"
 
 [patch.crates-io]
-hashbrown = { git = "https://github.com/jonhoo/hashbrown.git", branch = "reuse-raw-iter" }
-indexmap = { git = "https://github.com/jonhoo/indexmap.git", branch = "griddle-into-iter" }
+indexmap = { git = "https://github.com/jonhoo/indexmap.git", branch = "griddle" }
 hashbag = { git = "https://github.com/jonhoo/hashbag.git", branch = "griddle" }
-griddle = { git = "https://github.com/jonhoo/griddle.git", branch = "reuse-raw-iter" }
