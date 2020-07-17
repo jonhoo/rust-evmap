@@ -27,6 +27,14 @@
 //! meta will also be made visible to readers. This could be useful, for example, to indicate what
 //! time the refresh happened.
 //!
+//! # Features
+//!
+//!  - `eviction`: Gives you access to [`WriteHandle::empty_random`] to empty out randomly chosen
+//!    keys from the map.
+//!  - `amortize`: Amortizes the cost of resizes in the underlying data structures. See
+//!    [`griddle`](https://github.com/jonhoo/griddle/) and
+//!    [`atone`](https://github.com/jonhoo/atone/) for details.
+//!
 //! # Examples
 //!
 //! Single-reader, single-writer
