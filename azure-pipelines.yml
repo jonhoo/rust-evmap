@@ -1,5 +1,7 @@
 jobs:
  - template: default.yml@templates
+   # this will currently fail since it runs test with --all-features
+   # but amortize requires nightly...
    parameters:
      minrust: 1.40.0
      codecov_token: $(CODECOV_TOKEN_SECRET)
@@ -11,6 +13,18 @@ jobs:
      - template: install-rust.yml@templates
      - script: cargo test
        displayName: cargo test
+ - job: features
+   displayName: "Check feature combinations"
+   pool:
+     vmImage: ubuntu-latest
+   steps:
+     - template: install-rust.yml@templates
+       parameters:
+         rust: nightly # since amortize requires nightly
+     - script: cargo install cargo-hack
+       displayName: install cargo-hack
+     - script: cargo hack --feature-powerset check
+       displayName: cargo hack
  - job: benchmark
    displayName: "Check that benchmark compiles"
    pool:

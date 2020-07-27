@@ -2,9 +2,11 @@ use std::fmt;
 use std::hash::{BuildHasher, Hash};
 use std::mem::ManuallyDrop;
 
-#[cfg(feature = "indexed")]
+#[cfg(all(feature = "indexed", not(feature = "amortize")))]
 pub(crate) use indexmap::IndexMap as MapImpl;
-#[cfg(not(feature = "indexed"))]
+#[cfg(feature = "amortize")]
+pub(crate) use indexmap_amortized::IndexMap as MapImpl;
+#[cfg(not(any(feature = "indexed", feature = "amortize")))]
 pub(crate) use std::collections::HashMap as MapImpl;
 
 use crate::values::Values;

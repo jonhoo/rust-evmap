@@ -10,9 +10,11 @@ use std::sync::atomic;
 use std::sync::{Arc, MutexGuard};
 use std::{fmt, mem, thread};
 
-#[cfg(feature = "indexed")]
+#[cfg(all(feature = "indexed", not(feature = "amortize")))]
 use indexmap::map::Entry;
-#[cfg(not(feature = "indexed"))]
+#[cfg(feature = "amortize")]
+use indexmap_amortized::map::Entry;
+#[cfg(not(any(feature = "indexed", feature = "amortize")))]
 use std::collections::hash_map::Entry;
 
 /// A handle that may be used to modify the eventually consistent map.

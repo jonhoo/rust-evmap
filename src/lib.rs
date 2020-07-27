@@ -33,7 +33,8 @@
 //!    keys from the map.
 //!  - `amortize`: Amortizes the cost of resizes in the underlying data structures. See
 //!    [`griddle`](https://github.com/jonhoo/griddle/) and
-//!    [`atone`](https://github.com/jonhoo/atone/) for details.
+//!    [`atone`](https://github.com/jonhoo/atone/) for details. This requires a nightly compiler
+//!    [for the time being](https://docs.rs/indexmap-amortized/1.0/indexmap_amortized/#rust-version).
 //!
 //! # Examples
 //!
