@@ -1,5 +1,5 @@
 use super::{Operation, Predicate, ShallowCopy};
-use crate::inner::Inner;
+use crate::inner::{Entry, Inner};
 use crate::read::ReadHandle;
 use crate::values::Values;
 
@@ -9,13 +9,6 @@ use std::mem::ManuallyDrop;
 use std::sync::atomic;
 use std::sync::{Arc, MutexGuard};
 use std::{fmt, mem, thread};
-
-#[cfg(all(feature = "indexed", not(feature = "amortize")))]
-use indexmap::map::Entry;
-#[cfg(feature = "amortize")]
-use indexmap_amortized::map::Entry;
-#[cfg(not(any(feature = "indexed", feature = "amortize")))]
-use std::collections::hash_map::Entry;
 
 /// A handle that may be used to modify the eventually consistent map.
 ///
