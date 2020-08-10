@@ -1,9 +1,8 @@
 jobs:
- - template: default.yml@templates
+ - template: nightly-only.yml@templates
    # this will currently fail since it runs test with --all-features
    # but amortize requires nightly...
    parameters:
-     minrust: 1.40.0
      codecov_token: $(CODECOV_TOKEN_SECRET)
  - job: derive
    displayName: "Test evmap-derive"
@@ -20,7 +19,7 @@ jobs:
    steps:
      - template: install-rust.yml@templates
        parameters:
-         rust: nightly # since amortize requires nightly
+         rust: nightly
      - script: cargo install cargo-hack
        displayName: install cargo-hack
      - script: cargo hack --feature-powerset check
@@ -88,5 +87,5 @@ resources:
     - repository: templates
       type: github
       name: crate-ci/azure-pipelines
-      ref: refs/heads/v0.4
+      ref: refs/heads/add-nightly-only
       endpoint: jonhoo
