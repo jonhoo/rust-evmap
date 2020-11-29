@@ -214,8 +214,8 @@ pub use crate::write::WriteHandle;
 mod read;
 pub use crate::read::{MapReadRef, ReadGuardIter, ReadHandle, ReadHandleFactory};
 
-pub mod shallow_copy;
-pub use crate::shallow_copy::ShallowCopy;
+mod aliasing;
+pub use aliasing::Aliased;
 
 // Expose `ReadGuard` since it has useful methods the user will likely care about.
 #[doc(inline)]
@@ -257,9 +257,9 @@ impl<V: ?Sized> fmt::Debug for Predicate<V> {
 #[non_exhaustive]
 pub(crate) enum Operation<K, V, M> {
     /// Replace the set of entries for this key with this value.
-    Replace(K, V),
+    Replace(K, Aliased<V>),
     /// Add this value to the set of entries for this key.
-    Add(K, V),
+    Add(K, Aliased<V>),
     /// Remove this value from the set of entries for this key.
     RemoveValue(K, V),
     /// Remove the value set for this key.
@@ -400,7 +400,7 @@ where
     where
         K: Eq + Hash + Clone,
         S: BuildHasher + Clone,
-        V: Eq + Hash + ShallowCopy,
+        V: Eq + Hash,
         M: 'static + Clone,
     {
         let inner = if let Some(cap) = self.capacity {
@@ -426,7 +426,7 @@ pub fn new<K, V>() -> (
 )
 where
     K: Eq + Hash + Clone,
-    V: Eq + Hash + ShallowCopy,
+    V: Eq + Hash,
 {
     Options::default().construct()
 }
@@ -443,7 +443,7 @@ pub fn with_meta<K, V, M>(
 )
 where
     K: Eq + Hash + Clone,
-    V: Eq + Hash + ShallowCopy,
+    V: Eq + Hash,
     M: 'static + Clone,
 {
     Options::default().with_meta(meta).construct()
@@ -459,7 +459,7 @@ pub fn with_hasher<K, V, M, S>(
 ) -> (WriteHandle<K, V, M, S>, ReadHandle<K, V, M, S>)
 where
     K: Eq + Hash + Clone,
-    V: Eq + Hash + ShallowCopy,
+    V: Eq + Hash,
     M: 'static + Clone,
     S: BuildHasher + Clone,
 {
