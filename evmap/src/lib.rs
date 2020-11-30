@@ -257,9 +257,9 @@ impl<V: ?Sized> fmt::Debug for Predicate<V> {
 #[non_exhaustive]
 pub(crate) enum Operation<K, V, M> {
     /// Replace the set of entries for this key with this value.
-    Replace(K, Aliased<V>),
+    Replace(K, Aliased<V, crate::aliasing::NoDrop>),
     /// Add this value to the set of entries for this key.
-    Add(K, Aliased<V>),
+    Add(K, Aliased<V, crate::aliasing::NoDrop>),
     /// Remove this value from the set of entries for this key.
     RemoveValue(K, V),
     /// Remove the value set for this key.

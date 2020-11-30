@@ -1,4 +1,4 @@
-use crate::{inner::Inner, Aliased, Values};
+use crate::{aliasing::DropBehavior, inner::Inner, Aliased, Values};
 use left_right::ReadGuard;
 
 use std::borrow::Borrow;
@@ -208,7 +208,7 @@ where
     pub fn contains_value<Q: ?Sized, W: ?Sized>(&self, key: &Q, value: &W) -> bool
     where
         K: Borrow<Q>,
-        Aliased<V>: Borrow<W>,
+        Aliased<V, crate::aliasing::NoDrop>: Borrow<W>,
         Q: Hash + Eq,
         W: Hash + Eq,
         V: Hash + Eq,

@@ -1,7 +1,26 @@
-use std::cell::Cell;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::ops::Deref;
+
+// NOTE: These types _cannot_ be public, as doing so may cause external implementations to
+// implement different behavior for them, which would make transmutes between
+// SomeWrapper<Aliased<T, NoDrop>> and SomeWrapper<Aliased<T, DoDrop>> unsound.
+pub(crate) struct NoDrop;
+pub(crate) struct DoDrop;
+
+pub trait DropBehavior {
+    fn do_drop() -> bool;
+}
+impl DropBehavior for NoDrop {
+    fn do_drop() -> bool {
+        false
+    }
+}
+impl DropBehavior for DoDrop {
+    fn do_drop() -> bool {
+        true
+    }
+}
 
 /// A `T` that is aliased across the two map copies.
 ///
@@ -13,14 +32,19 @@ use std::ops::Deref;
 /// implementing your trait specifically for `Aliased<T>` where possible, or by manually
 /// dereferencing to get the `&T` before using the trait.
 #[repr(transparent)]
-pub struct Aliased<T> {
+pub struct Aliased<T, U>
+where
+    U: DropBehavior,
+{
     aliased: MaybeUninit<T>,
+
+    drop_behavior: PhantomData<U>,
 
     // We cannot implement Send just because T is Send since we're aliasing it.
     _no_auto_send: PhantomData<*const T>,
 }
 
-impl<T> Aliased<T> {
+impl<T> Aliased<T, NoDrop> {
     /// Create an alias of the inner `T`.
     ///
     /// # Safety
@@ -36,6 +60,7 @@ impl<T> Aliased<T> {
         //    b) we only expose _either_ &T while aliased, or &mut after the aliasing ends.
         Aliased {
             aliased: unsafe { std::ptr::read(&self.aliased) },
+            drop_behavior: PhantomData,
             _no_auto_send: PhantomData,
         }
     }
@@ -48,6 +73,21 @@ impl<T> Aliased<T> {
     pub(crate) fn from(t: T) -> Self {
         Self {
             aliased: MaybeUninit::new(t),
+            drop_behavior: PhantomData,
+            _no_auto_send: PhantomData,
+        }
+    }
+
+    /// Turn this aliased `T` into one that will drop the `T` when it is dropped.
+    ///
+    /// # Safety
+    ///
+    /// This is safe if and only if `self` is the last alias for the `T`.
+    pub(crate) unsafe fn dropping(self) -> Aliased<T, DoDrop> {
+        Aliased {
+            // safety:
+            aliased: std::ptr::read(&self.aliased),
+            drop_behavior: PhantomData,
             _no_auto_send: PhantomData,
         }
     }
@@ -58,63 +98,53 @@ impl<T> Aliased<T> {
 // This implies that we are only Send if T is Send+Sync, and Sync if T is Sync.
 //
 // Note that these bounds are stricter than what the compiler would auto-generate for the type.
-unsafe impl<T> Send for Aliased<T> where T: Send + Sync {}
-unsafe impl<T> Sync for Aliased<T> where T: Sync {}
-
-// XXX: Is this a problem if people start nesting evmaps?
-// I feel like the answer is yes.
-thread_local! {
-    static DROP_FOR_REAL: Cell<bool> = Cell::new(false);
+unsafe impl<T, U> Send for Aliased<T, U>
+where
+    U: DropBehavior,
+    T: Send + Sync,
+{
+}
+unsafe impl<T, U> Sync for Aliased<T, U>
+where
+    U: DropBehavior,
+    T: Sync,
+{
 }
 
-/// Make _any_ dropped `Aliased` actually drop their inner `T`.
-///
-/// Be very careful: this function will cause _all_ dropped `Aliased` to drop their `T`.
-///
-/// When the return value is dropped, dropping `Aliased` will have no effect again.
-///
-/// # Safety
-///
-/// Only set this when any following `Aliased` that are dropped are no longer aliased.
-pub(crate) unsafe fn drop_copies() -> impl Drop {
-    struct DropGuard;
-    impl Drop for DropGuard {
-        fn drop(&mut self) {
-            DROP_FOR_REAL.with(|dfr| dfr.set(false));
+impl<T, U> Drop for Aliased<T, U>
+where
+    U: DropBehavior,
+{
+    fn drop(&mut self) {
+        if U::do_drop() {
+            // safety:
+            //   MaybeUninit<T> was created from a valid T.
+            //   That T has not been dropped (getting a Aliased<T, DoDrop> is unsafe).
+            //   T is no longer aliased (by the safety assumption of getting a Aliased<T, DoDrop>),
+            //   so we are allowed to re-take ownership of the T.
+            unsafe { std::ptr::drop_in_place(self.aliased.as_mut_ptr()) }
         }
     }
-    let guard = DropGuard;
-    DROP_FOR_REAL.with(|dfr| dfr.set(true));
-    guard
 }
 
-impl<T> Drop for Aliased<T> {
-    fn drop(&mut self) {
-        DROP_FOR_REAL.with(move |drop_for_real| {
-            if drop_for_real.get() {
-                // safety:
-                //   MaybeUninit<T> was created from a valid T.
-                //   That T has not been dropped (drop_copies is unsafe).
-                //   T is no longer aliased (drop_copies is unsafe),
-                //   so we are allowed to re-take ownership of the T.
-                unsafe { std::ptr::drop_in_place(self.aliased.as_mut_ptr()) }
-            }
-        })
-    }
-}
-
-impl<T> AsRef<T> for Aliased<T> {
+impl<T, U> AsRef<T> for Aliased<T, U>
+where
+    U: DropBehavior,
+{
     fn as_ref(&self) -> &T {
         // safety:
         //   MaybeUninit<T> was created from a valid T.
-        //   That T has not been dropped (drop_copies is unsafe).
+        //   That T has not been dropped (getting a Aliased<T, DoDrop> is unsafe).
         //   All we have done to T is alias it. But, since we only give out &T
         //   (which should be legal anyway), we're fine.
         unsafe { &*self.aliased.as_ptr() }
     }
 }
 
-impl<T> Deref for Aliased<T> {
+impl<T, U> Deref for Aliased<T, U>
+where
+    U: DropBehavior,
+{
     type Target = T;
     fn deref(&self) -> &Self::Target {
         self.as_ref()
@@ -122,8 +152,9 @@ impl<T> Deref for Aliased<T> {
 }
 
 use std::hash::{Hash, Hasher};
-impl<T> Hash for Aliased<T>
+impl<T, U> Hash for Aliased<T, U>
 where
+    U: DropBehavior,
     T: Hash,
 {
     fn hash<H>(&self, state: &mut H)
@@ -135,8 +166,9 @@ where
 }
 
 use std::fmt;
-impl<T> fmt::Debug for Aliased<T>
+impl<T, U> fmt::Debug for Aliased<T, U>
 where
+    U: DropBehavior,
     T: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -144,8 +176,9 @@ where
     }
 }
 
-impl<T> PartialEq for Aliased<T>
+impl<T, U> PartialEq for Aliased<T, U>
 where
+    U: DropBehavior,
     T: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -157,10 +190,16 @@ where
     }
 }
 
-impl<T> Eq for Aliased<T> where T: Eq {}
-
-impl<T> PartialOrd for Aliased<T>
+impl<T, U> Eq for Aliased<T, U>
 where
+    U: DropBehavior,
+    T: Eq,
+{
+}
+
+impl<T, U> PartialOrd for Aliased<T, U>
+where
+    U: DropBehavior,
     T: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -184,8 +223,9 @@ where
     }
 }
 
-impl<T> Ord for Aliased<T>
+impl<T, U> Ord for Aliased<T, U>
 where
+    U: DropBehavior,
     T: Ord,
 {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
@@ -194,7 +234,10 @@ where
 }
 
 use std::borrow::Borrow;
-impl<T> Borrow<T> for Aliased<T> {
+impl<T, U> Borrow<T> for Aliased<T, U>
+where
+    U: DropBehavior,
+{
     fn borrow(&self) -> &T {
         self.as_ref()
     }
@@ -213,40 +256,52 @@ impl<T> Borrow<T> for Aliased<T> {
 // But unfortunately that won't work due to trait coherence.
 // Instead, we manually write the nice Borrow impls from std.
 // This won't help with custom Borrow impls, but gets you pretty far.
-impl Borrow<str> for Aliased<String> {
+impl<U> Borrow<str> for Aliased<String, U>
+where
+    U: DropBehavior,
+{
     fn borrow(&self) -> &str {
         self.as_ref()
     }
 }
-impl Borrow<std::path::Path> for Aliased<std::path::PathBuf> {
+impl<U> Borrow<std::path::Path> for Aliased<std::path::PathBuf, U>
+where
+    U: DropBehavior,
+{
     fn borrow(&self) -> &std::path::Path {
         self.as_ref()
     }
 }
-impl<T> Borrow<[T]> for Aliased<Vec<T>> {
+impl<T, U> Borrow<[T]> for Aliased<Vec<T>, U>
+where
+    U: DropBehavior,
+{
     fn borrow(&self) -> &[T] {
         self.as_ref()
     }
 }
-impl<T> Borrow<T> for Aliased<Box<T>>
+impl<T, U> Borrow<T> for Aliased<Box<T>, U>
 where
     T: ?Sized,
+    U: DropBehavior,
 {
     fn borrow(&self) -> &T {
         self.as_ref()
     }
 }
-impl<T> Borrow<T> for Aliased<std::sync::Arc<T>>
+impl<T, U> Borrow<T> for Aliased<std::sync::Arc<T>, U>
 where
     T: ?Sized,
+    U: DropBehavior,
 {
     fn borrow(&self) -> &T {
         self.as_ref()
     }
 }
-impl<T> Borrow<T> for Aliased<std::rc::Rc<T>>
+impl<T, U> Borrow<T> for Aliased<std::rc::Rc<T>, U>
 where
     T: ?Sized,
+    U: DropBehavior,
 {
     fn borrow(&self) -> &T {
         self.as_ref()

@@ -6,14 +6,16 @@ pub(crate) use indexmap::IndexMap as MapImpl;
 #[cfg(not(feature = "indexed"))]
 pub(crate) use std::collections::HashMap as MapImpl;
 
+use crate::aliasing::DropBehavior;
 use crate::values::Values;
 
-pub(crate) struct Inner<K, V, M, S>
+pub(crate) struct Inner<K, V, M, S, D = crate::aliasing::NoDrop>
 where
     K: Eq + Hash,
     S: BuildHasher,
+    D: DropBehavior,
 {
-    pub(crate) data: MapImpl<K, Values<V, S>, S>,
+    pub(crate) data: MapImpl<K, Values<V, S, D>, S>,
     pub(crate) meta: M,
     pub(crate) ready: bool,
 }
