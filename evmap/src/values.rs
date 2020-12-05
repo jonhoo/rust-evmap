@@ -9,11 +9,9 @@ const BAG_THRESHOLD: usize = 32;
 
 /// A bag of values for a given key in the evmap.
 #[repr(transparent)]
-pub struct Values<
-    T,
-    S = std::collections::hash_map::RandomState,
-    D: DropBehavior = crate::aliasing::NoDrop,
->(ValuesInner<T, S, D>);
+pub struct Values<T, S = std::collections::hash_map::RandomState>(
+    pub(crate) ValuesInner<T, S, crate::aliasing::NoDrop>,
+);
 
 impl<T, S> Default for Values<T, S> {
     fn default() -> Self {
@@ -21,18 +19,17 @@ impl<T, S> Default for Values<T, S> {
     }
 }
 
-impl<T, S, D> fmt::Debug for Values<T, S, D>
+impl<T, S> fmt::Debug for Values<T, S>
 where
     T: fmt::Debug,
     S: BuildHasher,
-    D: DropBehavior,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_set().entries(self.iter()).finish()
+        self.0.fmt(fmt)
     }
 }
 
-enum ValuesInner<T, S, D>
+pub(crate) enum ValuesInner<T, S, D>
 where
     D: DropBehavior,
 {
@@ -40,10 +37,27 @@ where
     Long(hashbag::HashBag<Aliased<T, D>, S>),
 }
 
-impl<T, S, D> Values<T, S, D>
+impl<T, S> Into<Values<T, S>> for ValuesInner<T, S, crate::aliasing::NoDrop> {
+    fn into(self) -> Values<T, S> {
+        Values(self)
+    }
+}
+
+impl<T, S, D> fmt::Debug for ValuesInner<T, S, D>
 where
     D: DropBehavior,
+    T: fmt::Debug,
+    S: BuildHasher,
 {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ValuesInner::Short(ref v) => fmt.debug_set().entries(v.iter()).finish(),
+            ValuesInner::Long(ref v) => fmt.debug_set().entries(v.iter()).finish(),
+        }
+    }
+}
+
+impl<T, S> Values<T, S> {
     /// Returns the number of values.
     pub fn len(&self) -> usize {
         match self.0 {
@@ -71,10 +85,10 @@ where
     /// An iterator visiting all elements in arbitrary order.
     ///
     /// The iterator element type is &'a T.
-    pub fn iter(&self) -> ValuesIter<'_, T, S, D> {
+    pub fn iter(&self) -> ValuesIter<'_, T, S> {
         match self.0 {
-            ValuesInner::Short(ref v) => ValuesIter::Short(v.iter()),
-            ValuesInner::Long(ref v) => ValuesIter::Long(v.iter()),
+            ValuesInner::Short(ref v) => ValuesIter(ValuesIterInner::Short(v.iter())),
+            ValuesInner::Long(ref v) => ValuesIter(ValuesIterInner::Long(v.iter())),
         }
     }
 
@@ -96,7 +110,7 @@ where
     /// *must* match those for the value type.
     pub fn contains<Q: ?Sized>(&self, value: &Q) -> bool
     where
-        Aliased<T, D>: Borrow<Q>,
+        Aliased<T, crate::aliasing::NoDrop>: Borrow<Q>,
         Q: Eq + Hash,
         T: Eq + Hash,
         S: BuildHasher,
@@ -113,101 +127,88 @@ where
     }
 }
 
-impl<'a, T, S, D> IntoIterator for &'a Values<T, S, D>
-where
-    D: DropBehavior,
-{
-    type IntoIter = ValuesIter<'a, T, S, D>;
+impl<'a, T, S> IntoIterator for &'a Values<T, S> {
+    type IntoIter = ValuesIter<'a, T, S>;
     type Item = &'a T;
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
+pub struct ValuesIter<'a, T, S>(ValuesIterInner<'a, T, S>);
+
 #[non_exhaustive]
-pub enum ValuesIter<'a, T, S, D>
-where
-    D: DropBehavior,
-{
-    #[doc(hidden)]
-    Short(<&'a smallvec::SmallVec<[Aliased<T, D>; 1]> as IntoIterator>::IntoIter),
-    #[doc(hidden)]
-    Long(<&'a hashbag::HashBag<Aliased<T, D>, S> as IntoIterator>::IntoIter),
+enum ValuesIterInner<'a, T, S> {
+    Short(<&'a smallvec::SmallVec<[Aliased<T, crate::aliasing::NoDrop>; 1]> as IntoIterator>::IntoIter),
+    Long(<&'a hashbag::HashBag<Aliased<T, crate::aliasing::NoDrop>, S> as IntoIterator>::IntoIter),
 }
 
-impl<'a, T, S, D> fmt::Debug for ValuesIter<'a, T, S, D>
+impl<'a, T, S> fmt::Debug for ValuesIter<'a, T, S>
 where
     T: fmt::Debug,
-    D: DropBehavior,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            ValuesIter::Short(ref it) => f.debug_tuple("Short").field(it).finish(),
-            ValuesIter::Long(ref it) => f.debug_tuple("Long").field(it).finish(),
+        match self.0 {
+            ValuesIterInner::Short(ref it) => f.debug_tuple("Short").field(it).finish(),
+            ValuesIterInner::Long(ref it) => f.debug_tuple("Long").field(it).finish(),
         }
     }
 }
 
-impl<'a, T, S, D> Iterator for ValuesIter<'a, T, S, D>
-where
-    D: DropBehavior,
-{
+impl<'a, T, S> Iterator for ValuesIter<'a, T, S> {
     type Item = &'a T;
     fn next(&mut self) -> Option<Self::Item> {
-        match *self {
-            Self::Short(ref mut it) => it.next().map(|v| &**v),
-            Self::Long(ref mut it) => it.next().map(|v| &**v),
+        match self.0 {
+            ValuesIterInner::Short(ref mut it) => it.next().map(|v| &**v),
+            ValuesIterInner::Long(ref mut it) => it.next().map(|v| &**v),
         }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        match self {
-            Self::Short(it) => it.size_hint(),
-            Self::Long(it) => it.size_hint(),
+        match self.0 {
+            ValuesIterInner::Short(ref it) => it.size_hint(),
+            ValuesIterInner::Long(ref it) => it.size_hint(),
         }
     }
 }
 
-impl<'a, T, S, D> ExactSizeIterator for ValuesIter<'a, T, S, D>
+impl<'a, T, S> ExactSizeIterator for ValuesIter<'a, T, S>
 where
-    D: DropBehavior,
     <&'a smallvec::SmallVec<[T; 1]> as IntoIterator>::IntoIter: ExactSizeIterator,
     <&'a hashbag::HashBag<T, S> as IntoIterator>::IntoIter: ExactSizeIterator,
 {
 }
 
-impl<'a, T, S, D> std::iter::FusedIterator for ValuesIter<'a, T, S, D>
+impl<'a, T, S> std::iter::FusedIterator for ValuesIter<'a, T, S>
 where
-    D: DropBehavior,
     <&'a smallvec::SmallVec<[T; 1]> as IntoIterator>::IntoIter: std::iter::FusedIterator,
     <&'a hashbag::HashBag<T, S> as IntoIterator>::IntoIter: std::iter::FusedIterator,
 {
 }
 
-impl<T, S, D> Values<T, S, D>
+impl<T, S, D> ValuesInner<T, S, D>
 where
+    D: DropBehavior,
     T: Eq + Hash,
     S: BuildHasher + Clone,
-    D: DropBehavior,
 {
     pub(crate) fn new() -> Self {
-        Self(ValuesInner::Short(smallvec::SmallVec::new()))
+        ValuesInner::Short(smallvec::SmallVec::new())
     }
 
     pub(crate) fn with_capacity_and_hasher(capacity: usize, hasher: &S) -> Self {
         if capacity > BAG_THRESHOLD {
-            Self(ValuesInner::Long(
-                hashbag::HashBag::with_capacity_and_hasher(capacity, hasher.clone()),
+            ValuesInner::Long(hashbag::HashBag::with_capacity_and_hasher(
+                capacity,
+                hasher.clone(),
             ))
         } else {
-            Self(ValuesInner::Short(smallvec::SmallVec::with_capacity(
-                capacity,
-            )))
+            ValuesInner::Short(smallvec::SmallVec::with_capacity(capacity))
         }
     }
 
     pub(crate) fn shrink_to_fit(&mut self) {
-        match self.0 {
+        match self {
             ValuesInner::Short(ref mut v) => v.shrink_to_fit(),
             ValuesInner::Long(ref mut v) => {
                 // here, we actually want to be clever
@@ -237,7 +238,7 @@ where
                         assert_eq!(n, 1);
                         short.push(row);
                     }
-                    self.0 = ValuesInner::Short(short);
+                    *self = ValuesInner::Short(short);
                 } else {
                     v.shrink_to_fit();
                 }
@@ -247,14 +248,14 @@ where
 
     pub(crate) fn clear(&mut self) {
         // NOTE: we do _not_ downgrade to Short here -- shrink is for that
-        match self.0 {
+        match self {
             ValuesInner::Short(ref mut v) => v.clear(),
             ValuesInner::Long(ref mut v) => v.clear(),
         }
     }
 
     pub(crate) fn swap_remove(&mut self, value: &T) {
-        match self.0 {
+        match self {
             ValuesInner::Short(ref mut v) => {
                 if let Some(i) = v.iter().position(|v| &**v == value) {
                     v.swap_remove(i);
@@ -267,7 +268,7 @@ where
     }
 
     fn baggify(&mut self, capacity: usize, hasher: &S) {
-        if let ValuesInner::Short(ref mut v) = self.0 {
+        if let ValuesInner::Short(ref mut v) = self {
             let mut long = hashbag::HashBag::with_capacity_and_hasher(capacity, hasher.clone());
 
             // NOTE: this _may_ drop some values since the bag does not keep duplicates.
@@ -277,12 +278,12 @@ where
             // exact same original state, this change from short/long should occur exactly
             // the same.
             long.extend(v.drain(..));
-            self.0 = ValuesInner::Long(long);
+            *self = ValuesInner::Long(long);
         }
     }
 
     pub(crate) fn reserve(&mut self, additional: usize, hasher: &S) {
-        match self.0 {
+        match self {
             ValuesInner::Short(ref mut v) => {
                 let n = v.len() + additional;
                 if n >= BAG_THRESHOLD {
@@ -296,13 +297,13 @@ where
     }
 
     pub(crate) fn push(&mut self, value: Aliased<T, D>, hasher: &S) {
-        match self.0 {
+        match self {
             ValuesInner::Short(ref mut v) => {
                 // we may want to upgrade to a Long..
                 let n = v.len() + 1;
                 if n >= BAG_THRESHOLD {
                     self.baggify(n, hasher);
-                    if let ValuesInner::Long(ref mut v) = self.0 {
+                    if let ValuesInner::Long(ref mut v) = self {
                         v.insert(value);
                     } else {
                         unreachable!();
@@ -321,25 +322,32 @@ where
     where
         F: FnMut(&T) -> bool,
     {
-        match self.0 {
+        match self {
             ValuesInner::Short(ref mut v) => v.retain(|v| f(&*v)),
             ValuesInner::Long(ref mut v) => v.retain(|v, n| if f(v) { n } else { 0 }),
         }
     }
 }
 
-impl<T, S> Values<T, S, crate::aliasing::DoDrop>
+impl<T, S> AsRef<Values<T, S>> for ValuesInner<T, S, crate::aliasing::NoDrop> {
+    fn as_ref(&self) -> &Values<T, S> {
+        // safety: Values is #[repr(transparent)]
+        unsafe { &*(self as *const _ as *const Values<T, S>) }
+    }
+}
+
+impl<T, S> ValuesInner<T, S, crate::aliasing::DoDrop>
 where
     T: Eq + Hash,
     S: BuildHasher + Clone,
 {
-    pub(crate) fn alias(other: &Values<T, S, crate::aliasing::NoDrop>, hasher: &S) -> Self {
-        match &other.0 {
+    pub(crate) fn alias(other: &ValuesInner<T, S, crate::aliasing::NoDrop>, hasher: &S) -> Self {
+        match &other {
             ValuesInner::Short(s) => {
                 use std::iter::FromIterator;
-                Self(ValuesInner::Short(smallvec::SmallVec::from_iter(
+                ValuesInner::Short(smallvec::SmallVec::from_iter(
                     s.iter().map(|v| unsafe { v.alias().dropping() }),
-                )))
+                ))
             }
             ValuesInner::Long(l) => {
                 let mut long = hashbag::HashBag::with_hasher(hasher.clone());
@@ -347,7 +355,7 @@ where
                     l.set_iter()
                         .map(|(v, n)| (unsafe { v.alias().dropping() }, n)),
                 );
-                Self(ValuesInner::Long(long))
+                ValuesInner::Long(long)
             }
         }
     }

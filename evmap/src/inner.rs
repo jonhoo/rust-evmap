@@ -7,7 +7,7 @@ pub(crate) use indexmap::IndexMap as MapImpl;
 pub(crate) use std::collections::HashMap as MapImpl;
 
 use crate::aliasing::DropBehavior;
-use crate::values::Values;
+use crate::values::ValuesInner;
 
 pub(crate) struct Inner<K, V, M, S, D = crate::aliasing::NoDrop>
 where
@@ -15,7 +15,7 @@ where
     S: BuildHasher,
     D: DropBehavior,
 {
-    pub(crate) data: MapImpl<K, Values<V, S, D>, S>,
+    pub(crate) data: MapImpl<K, ValuesInner<V, S, D>, S>,
     pub(crate) meta: M,
     pub(crate) ready: bool,
 }

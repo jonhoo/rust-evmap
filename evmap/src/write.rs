@@ -1,7 +1,7 @@
 use super::{Aliased, Operation, Predicate};
 use crate::inner::Inner;
 use crate::read::ReadHandle;
-use crate::values::Values;
+use crate::values::ValuesInner;
 use left_right::Absorb;
 
 use std::collections::hash_map::RandomState;
@@ -337,7 +337,10 @@ where
         let hasher = other.data.hasher();
         match *op {
             Operation::Replace(ref key, ref mut value) => {
-                let vs = self.data.entry(key.clone()).or_insert_with(Values::new);
+                let vs = self
+                    .data
+                    .entry(key.clone())
+                    .or_insert_with(ValuesInner::new);
 
                 // truncate vector
                 vs.clear();
@@ -351,13 +354,13 @@ where
             Operation::Clear(ref key) => {
                 self.data
                     .entry(key.clone())
-                    .or_insert_with(Values::new)
+                    .or_insert_with(ValuesInner::new)
                     .clear();
             }
             Operation::Add(ref key, ref mut value) => {
                 self.data
                     .entry(key.clone())
-                    .or_insert_with(Values::new)
+                    .or_insert_with(ValuesInner::new)
                     .push(value.alias(), hasher);
             }
             Operation::RemoveEntry(ref key) => {
@@ -407,7 +410,7 @@ where
                     entry.get_mut().reserve(additional, hasher);
                 }
                 Entry::Vacant(entry) => {
-                    entry.insert(Values::with_capacity_and_hasher(additional, hasher));
+                    entry.insert(ValuesInner::with_capacity_and_hasher(additional, hasher));
                 }
             },
             Operation::MarkReady => {
@@ -436,7 +439,7 @@ where
         let hasher = other.data.hasher();
         match op {
             Operation::Replace(key, value) => {
-                let v = inner.data.entry(key).or_insert_with(Values::new);
+                let v = inner.data.entry(key).or_insert_with(ValuesInner::new);
                 v.clear();
                 v.shrink_to_fit();
 
@@ -447,7 +450,11 @@ where
                 v.push(unsafe { value.dropping() }, hasher);
             }
             Operation::Clear(key) => {
-                inner.data.entry(key).or_insert_with(Values::new).clear();
+                inner
+                    .data
+                    .entry(key)
+                    .or_insert_with(ValuesInner::new)
+                    .clear();
             }
             Operation::Add(key, value) => {
                 // safety (below):
@@ -457,7 +464,7 @@ where
                 inner
                     .data
                     .entry(key)
-                    .or_insert_with(Values::new)
+                    .or_insert_with(ValuesInner::new)
                     .push(unsafe { value.dropping() }, hasher);
             }
             Operation::RemoveEntry(key) => {
@@ -508,7 +515,7 @@ where
                     entry.get_mut().reserve(additional, hasher);
                 }
                 Entry::Vacant(entry) => {
-                    entry.insert(Values::with_capacity_and_hasher(additional, hasher));
+                    entry.insert(ValuesInner::with_capacity_and_hasher(additional, hasher));
                 }
             },
             Operation::MarkReady => {
@@ -528,7 +535,7 @@ where
                     other
                         .data
                         .iter()
-                        .map(|(k, vs)| (k.clone(), Values::alias(vs, other.data.hasher()))),
+                        .map(|(k, vs)| (k.clone(), ValuesInner::alias(vs, other.data.hasher()))),
                 );
             }
         }

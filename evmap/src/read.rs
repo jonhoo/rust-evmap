@@ -1,4 +1,4 @@
-use crate::{aliasing::DropBehavior, inner::Inner, Aliased, Values};
+use crate::{inner::Inner, Aliased, Values};
 use left_right::ReadGuard;
 
 use std::borrow::Borrow;
@@ -111,7 +111,7 @@ where
             return None;
         }
 
-        ReadGuard::try_map(inner, |inner| inner.data.get(key))
+        ReadGuard::try_map(inner, |inner| inner.data.get(key).map(AsRef::as_ref))
     }
 
     /// Returns a guarded reference to the values corresponding to the key.
@@ -180,7 +180,7 @@ where
             return None;
         }
         let meta = inner.meta.clone();
-        let res = ReadGuard::try_map(inner, |inner| inner.data.get(key));
+        let res = ReadGuard::try_map(inner, |inner| inner.data.get(key).map(AsRef::as_ref));
         Some((res, meta))
     }
 
