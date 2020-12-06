@@ -288,7 +288,7 @@ where
         &'a mut self,
         rng: &mut impl rand::Rng,
         n: usize,
-    ) -> impl ExactSizeIterator<Item = (&'a K, &'a Values<V, S>)> {
+    ) -> impl ExactSizeIterator<Item = (&'a K, &'a crate::values::Values<V, S>)> {
         // force a publish so that our view into self.r_handle matches the indices we choose.
         // if we didn't do this, the `i`th element of r_handle may be a completely different
         // element than the one that _will_ be evicted when `EmptyAt([.. i ..])` is applied.
@@ -320,7 +320,7 @@ where
 
         indices.into_iter().map(move |i| {
             let (k, vs) = inner.get_index(i).expect("in-range");
-            (k, vs)
+            (k, vs.as_ref())
         })
     }
 }
