@@ -1,5 +1,4 @@
-use crate::aliasing::DropBehavior;
-use crate::Aliased;
+use left_right::aliasing::{Aliased, DropBehavior};
 use std::borrow::Borrow;
 use std::fmt;
 use std::hash::{BuildHasher, Hash};
@@ -273,7 +272,7 @@ where
 
             // NOTE: this _may_ drop some values since the bag does not keep duplicates.
             // that should be fine -- if we drop for the first time, we're dropping
-            // ManuallyDrop, which won't actually drop the shallow copies. when we drop for
+            // ManuallyDrop, which won't actually drop the aliased values. when we drop for
             // the second time, we do the actual dropping. since second application has the
             // exact same original state, this change from short/long should occur exactly
             // the same.
@@ -341,20 +340,20 @@ where
     T: Eq + Hash,
     S: BuildHasher + Clone,
 {
-    pub(crate) fn alias(other: &ValuesInner<T, S, crate::aliasing::NoDrop>, hasher: &S) -> Self {
+    pub(crate) unsafe fn alias(
+        other: &ValuesInner<T, S, crate::aliasing::NoDrop>,
+        hasher: &S,
+    ) -> Self {
         match &other {
             ValuesInner::Short(s) => {
                 use std::iter::FromIterator;
                 ValuesInner::Short(smallvec::SmallVec::from_iter(
-                    s.iter().map(|v| unsafe { v.alias().dropping() }),
+                    s.iter().map(|v| v.alias().change_drop()),
                 ))
             }
             ValuesInner::Long(l) => {
                 let mut long = hashbag::HashBag::with_hasher(hasher.clone());
-                long.extend(
-                    l.set_iter()
-                        .map(|(v, n)| (unsafe { v.alias().dropping() }, n)),
-                );
+                long.extend(l.set_iter().map(|(v, n)| (v.alias().change_drop(), n)));
                 ValuesInner::Long(long)
             }
         }
@@ -395,15 +394,13 @@ mod tests {
 
     #[test]
     fn short_values() {
-        let _guard = unsafe { crate::aliasing::drop_copies() };
-
         let hasher = RandomState::default();
-        let mut v = Values::new();
+        let mut v = Values(ValuesInner::new());
 
         let values = 0..BAG_THRESHOLD - 1;
         let len = values.clone().count();
         for i in values.clone() {
-            v.push(Aliased::from(i), &hasher);
+            v.0.push(Aliased::from(i), &hasher);
         }
 
         for i in values.clone() {
@@ -413,7 +410,7 @@ mod tests {
         assert_len!(v, len);
         assert_eq!(v.get_one(), Some(&0));
 
-        v.clear();
+        v.0.clear();
 
         assert_empty!(v);
 
@@ -421,22 +418,20 @@ mod tests {
         assert!(v.capacity() > 1);
         assert!(v.is_short());
 
-        v.shrink_to_fit();
+        v.0.shrink_to_fit();
 
         assert_eq!(v.capacity(), 1);
     }
 
     #[test]
     fn long_values() {
-        let _guard = unsafe { crate::aliasing::drop_copies() };
-
         let hasher = RandomState::default();
-        let mut v = Values::new();
+        let mut v = Values(ValuesInner::new());
 
         let values = 0..BAG_THRESHOLD;
         let len = values.clone().count();
         for i in values.clone() {
-            v.push(Aliased::from(i), &hasher);
+            v.0.push(Aliased::from(i), &hasher);
         }
 
         for i in values.clone() {
@@ -446,7 +441,7 @@ mod tests {
         assert_len!(v, len);
         assert!(values.contains(v.get_one().unwrap()));
 
-        v.clear();
+        v.0.clear();
 
         assert_empty!(v);
 
@@ -454,7 +449,7 @@ mod tests {
         assert!(v.capacity() > 1);
         assert!(!v.is_short());
 
-        v.shrink_to_fit();
+        v.0.shrink_to_fit();
 
         // Now we have short values!
         assert!(v.is_short());

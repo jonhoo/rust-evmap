@@ -334,6 +334,14 @@ where
 {
     /// Apply ops in such a way that no values are dropped, only forgotten
     fn absorb_first(&mut self, op: &mut Operation<K, V, M>, other: &Self) {
+        // Safety note for calls to .alias():
+        //
+        //   it is safe to alias this value here because if it is ever removed, one alias is always
+        //   first dropped with NoDrop (in absorb_first), and _then_ the other (and only remaining)
+        //   alias is dropped with DoDrop (in absorb_second). we won't drop the aliased value until
+        //   _after_ absorb_second is called on this operation, so leaving an alias in the oplog is
+        //   also safe.
+
         let hasher = other.data.hasher();
         match *op {
             Operation::Replace(ref key, ref mut value) => {
@@ -349,7 +357,7 @@ where
                 // so it will switch back to inline allocation for the subsequent push.
                 vs.shrink_to_fit();
 
-                vs.push(value.alias(), hasher);
+                vs.push(unsafe { value.alias() }, hasher);
             }
             Operation::Clear(ref key) => {
                 self.data
@@ -361,7 +369,7 @@ where
                 self.data
                     .entry(key.clone())
                     .or_insert_with(ValuesInner::new)
-                    .push(value.alias(), hasher);
+                    .push(unsafe { value.alias() }, hasher);
             }
             Operation::RemoveEntry(ref key) => {
                 #[cfg(not(feature = "indexed"))]
@@ -428,7 +436,14 @@ where
 
     /// Apply operations while allowing dropping of values
     fn absorb_second(&mut self, op: Operation<K, V, M>, other: &Self) {
-        // Safety: It is safe for us to drop values the second time each operation has been
+        // # Safety (for cast):
+        //
+        // See the module-level documentation for left_right::aliasing.
+        // NoDrop and DoDrop are both private, therefore this cast is (likely) sound.
+        //
+        // # Safety (for NoDrop -> DoDrop):
+        //
+        // It is safe for us to drop values the second time each operation has been
         // performed, since if they are dropped here, they were also dropped in the first
         // application of the operation, which removed the only other alias.
         //
@@ -436,6 +451,12 @@ where
         let inner: &mut Inner<K, V, M, S, crate::aliasing::DoDrop> =
             unsafe { &mut *(self as *mut _ as *mut _) };
 
+        // Safety note for calls to .change_drop():
+        //
+        //   we're turning a NoDrop into DoDrop, so we must be prepared for a drop.
+        //   if absorb_first dropped its alias, then `value` is the only alias
+        //   if absorb_first did not drop its alias, then `value` will not be dropped here either,
+        //   and at the end of scope we revert to `NoDrop`, so all is well.
         let hasher = other.data.hasher();
         match op {
             Operation::Replace(key, value) => {
@@ -443,11 +464,7 @@ where
                 v.clear();
                 v.shrink_to_fit();
 
-                // safety:
-                //   if absorb_first dropped the value, then `value` is the only alias
-                //   if absorb_first did not drop the value, then `value` will not be dropped here
-                //   either, and at the end of scope we revert to `NoDrop`, so all is well.
-                v.push(unsafe { value.dropping() }, hasher);
+                v.push(unsafe { value.change_drop() }, hasher);
             }
             Operation::Clear(key) => {
                 inner
@@ -458,6 +475,7 @@ where
             }
             Operation::Add(key, value) => {
                 // safety (below):
+                //   we're turning a NoDrop into DoDrop, so we must be prepared for a drop.
                 //   if absorb_first dropped the value, then `value` is the only alias
                 //   if absorb_first did not drop the value, then `value` will not be dropped here
                 //   either, and at the end of scope we revert to `NoDrop`, so all is well.
@@ -465,7 +483,7 @@ where
                     .data
                     .entry(key)
                     .or_insert_with(ValuesInner::new)
-                    .push(unsafe { value.dropping() }, hasher);
+                    .push(unsafe { value.change_drop() }, hasher);
             }
             Operation::RemoveEntry(key) => {
                 #[cfg(not(feature = "indexed"))]
@@ -531,12 +549,25 @@ where
 
                 // XXX: it really is too bad that we can't just .clone() the data here and save
                 // ourselves a lot of re-hashing, re-bucketization, etc.
-                inner.data.extend(
-                    other
-                        .data
-                        .iter()
-                        .map(|(k, vs)| (k.clone(), ValuesInner::alias(vs, other.data.hasher()))),
-                );
+                inner.data.extend(other.data.iter().map(|(k, vs)| {
+                    // # Safety (for aliasing):
+                    //
+                    // We are aliasing every value in the read map, and the oplog has no other
+                    // pending operations (by the semantics of JustCloneRHandle). For any of the
+                    // values we alias to be dropped, the operation that drops it must first be
+                    // enqueued to the oplog, at which point it will _first_ go through
+                    // absorb_first, which will remove the alias and leave only one alias left.
+                    // Only after that, when that operation eventually goes through absorb_second,
+                    // will the alias be dropped, and by that time it is the only value.
+                    //
+                    // # Safety (for NoDrop -> DoDrop):
+                    //
+                    // The oplog has only this one operation in it for the first call to `publish`,
+                    // so we are about to turn the alias back into NoDrop.
+                    (k.clone(), unsafe {
+                        ValuesInner::alias(vs, other.data.hasher())
+                    })
+                }));
             }
         }
     }

@@ -215,7 +215,11 @@ mod read;
 pub use crate::read::{MapReadRef, ReadGuardIter, ReadHandle, ReadHandleFactory};
 
 mod aliasing;
-pub use aliasing::Aliased;
+
+// This needs to be public since we use it in bounds,
+// but users should generally be able to ignore the type.
+#[doc(hidden)]
+pub use left_right::aliasing::Aliased;
 
 // Expose `ReadGuard` since it has useful methods the user will likely care about.
 #[doc(inline)]

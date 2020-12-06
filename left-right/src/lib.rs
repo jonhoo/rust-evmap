@@ -180,6 +180,8 @@ pub use crate::write::WriteHandle;
 mod read;
 pub use crate::read::{ReadGuard, ReadHandle, ReadHandleFactory};
 
+pub mod aliasing;
+
 /// Types that can incorporate operations of type `O`.
 ///
 /// This trait allows `left-right` to keep the two copies of the underlying data structure (see the

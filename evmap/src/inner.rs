@@ -6,8 +6,8 @@ pub(crate) use indexmap::IndexMap as MapImpl;
 #[cfg(not(feature = "indexed"))]
 pub(crate) use std::collections::HashMap as MapImpl;
 
-use crate::aliasing::DropBehavior;
 use crate::values::ValuesInner;
+use left_right::aliasing::DropBehavior;
 
 pub(crate) struct Inner<K, V, M, S, D = crate::aliasing::NoDrop>
 where
