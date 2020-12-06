@@ -325,7 +325,7 @@ where
         };
 
         let (mut w, r) = left_right::new_from_empty(inner);
-        w.append(Operation::MarkReady);
+        w.append(write::Operation::MarkReady);
 
         (WriteHandle::new(w), ReadHandle::new(r))
     }

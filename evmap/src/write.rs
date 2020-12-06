@@ -621,7 +621,7 @@ where
 
 /// A pending map operation.
 #[non_exhaustive]
-pub(crate) enum Operation<K, V, M> {
+pub(super) enum Operation<K, V, M> {
     /// Replace the set of entries for this key with this value.
     Replace(K, Aliased<V, crate::aliasing::NoDrop>),
     /// Add this value to the set of entries for this key.
@@ -694,12 +694,12 @@ where
 ///
 /// The predicate function is called once for each distinct value, and `true` if this is the
 /// _first_ call to the predicate on the _second_ application of the operation.
-pub struct Predicate<V: ?Sized>(pub(crate) Box<dyn FnMut(&V, bool) -> bool + Send>);
+pub(super) struct Predicate<V: ?Sized>(Box<dyn FnMut(&V, bool) -> bool + Send>);
 
 impl<V: ?Sized> Predicate<V> {
     /// Evaluate the predicate for the given element
     #[inline]
-    pub fn eval(&mut self, value: &V, reset: bool) -> bool {
+    fn eval(&mut self, value: &V, reset: bool) -> bool {
         (*self.0)(value, reset)
     }
 }

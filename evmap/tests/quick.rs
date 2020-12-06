@@ -2,7 +2,7 @@
 
 extern crate evmap;
 
-use evmap::{ReadHandle, WriteHandle};
+use evmap::handles::{ReadHandle, WriteHandle};
 
 extern crate quickcheck;
 #[macro_use(quickcheck)]
