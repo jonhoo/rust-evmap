@@ -60,7 +60,7 @@ where
     K: Eq + Hash,
     S: BuildHasher,
 {
-    pub fn with_hasher(m: M, hash_builder: S) -> Self {
+    pub(crate) fn with_hasher(m: M, hash_builder: S) -> Self {
         Inner {
             data: MapImpl::with_hasher(hash_builder),
             meta: m,
@@ -68,7 +68,7 @@ where
         }
     }
 
-    pub fn with_capacity_and_hasher(m: M, capacity: usize, hash_builder: S) -> Self {
+    pub(crate) fn with_capacity_and_hasher(m: M, capacity: usize, hash_builder: S) -> Self {
         Inner {
             data: MapImpl::with_capacity_and_hasher(capacity, hash_builder),
             meta: m,

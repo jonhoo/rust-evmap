@@ -197,7 +197,11 @@
     broken_intra_doc_links
 )]
 #![allow(clippy::type_complexity)]
+// This _should_ detect if we ever accidentally leak aliasing::NoDrop.
+// But, currently, it does not..
+#![deny(unreachable_pub)]
 
+use left_right::aliasing::Aliased;
 use std::collections::hash_map::RandomState;
 use std::fmt;
 use std::hash::{BuildHasher, Hash};
@@ -212,14 +216,20 @@ mod write;
 pub use crate::write::WriteHandle;
 
 mod read;
-pub use crate::read::{MapReadRef, ReadGuardIter, ReadHandle, ReadHandleFactory};
+// These cannot use ::{..} syntax because of
+// https://github.com/rust-lang/rust/issues/57411
+pub use crate::read::ReadHandle;
+pub use crate::read::ReadHandleFactory;
 
+/// Helper types that give access to values inside the read half of an `evmap`.
+pub mod refs {
+    // Same here, ::{..} won't work.
+    pub use crate::read::MapReadRef;
+    pub use crate::read::ReadGuardIter;
+}
+
+// NOTE: It is _critical_ that this module is not public.
 mod aliasing;
-
-// This needs to be public since we use it in bounds,
-// but users should generally be able to ignore the type.
-#[doc(hidden)]
-pub use left_right::aliasing::Aliased;
 
 // Expose `ReadGuard` since it has useful methods the user will likely care about.
 #[doc(inline)]
