@@ -217,9 +217,9 @@ where
                 // not move to a SmallVec. The reason is simple: if we did, we would need to
                 // duplicate those rows again. But, how would we do so safely? If we clone into
                 // both the left and the right map (that is, on both first and second apply), then
-                // we would only free one of them. If we shallow_copy the one we have in the
-                // hashbag, then once any instance gets remove from both sides, it'll be freed,
-                // which will invalidate the remaining references.
+                // we would only free one of them. If we alias the one we have in the hashbag, then
+                // once any instance gets remove from both sides, it'll be freed, which will
+                // invalidate the remaining references.
                 if v.len() < BAG_THRESHOLD && v.len() == v.set_len() {
                     let mut short = smallvec::SmallVec::with_capacity(v.len());
                     // NOTE: this drain _must_ have a deterministic iteration order.
@@ -227,7 +227,7 @@ where
                     // we are iterating on the left or right map. otherwise, this happens;
                     //
                     //   1. after shrink_to_fit, left value is AA*B*, right is B*AA*.
-                    //      X* elements are shallow copies of each other
+                    //      X* elements are aliased copies of each other
                     //   2. swap_remove B (1st); left is AA*B*, right is now A*A
                     //   3. swap_remove B (2nd); left drops B* and is now AA*, right is A*A
                     //   4. swap_remove A (1st); left is now A*, right is A*A
