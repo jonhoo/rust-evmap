@@ -1,4 +1,4 @@
-use crate::{inner::Inner, Aliased, Values};
+use crate::{inner::Inner, values::Values, Aliased};
 use left_right::ReadGuard;
 
 use std::borrow::Borrow;

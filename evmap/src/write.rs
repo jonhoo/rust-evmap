@@ -1,8 +1,7 @@
-use super::{Aliased, Operation, Predicate};
 use crate::inner::Inner;
 use crate::read::ReadHandle;
 use crate::values::ValuesInner;
-use left_right::Absorb;
+use left_right::{aliasing::Aliased, Absorb};
 
 use std::collections::hash_map::RandomState;
 use std::fmt;
@@ -617,5 +616,108 @@ where
     type Target = ReadHandle<K, V, M, S>;
     fn deref(&self) -> &Self::Target {
         &self.r_handle
+    }
+}
+
+/// A pending map operation.
+#[non_exhaustive]
+pub(crate) enum Operation<K, V, M> {
+    /// Replace the set of entries for this key with this value.
+    Replace(K, Aliased<V, crate::aliasing::NoDrop>),
+    /// Add this value to the set of entries for this key.
+    Add(K, Aliased<V, crate::aliasing::NoDrop>),
+    /// Remove this value from the set of entries for this key.
+    RemoveValue(K, V),
+    /// Remove the value set for this key.
+    RemoveEntry(K),
+    #[cfg(feature = "eviction")]
+    /// Drop keys at the given indices.
+    ///
+    /// The list of indices must be sorted in ascending order.
+    EmptyAt(Vec<usize>),
+    /// Remove all values in the value set for this key.
+    Clear(K),
+    /// Remove all values for all keys.
+    ///
+    /// Note that this will iterate once over all the keys internally.
+    Purge,
+    /// Retains all values matching the given predicate.
+    Retain(K, Predicate<V>),
+    /// Shrinks [`Values`] to their minimum necessary size, freeing memory
+    /// and potentially improving cache locality.
+    ///
+    /// If no key is given, all `Values` will shrink to fit.
+    Fit(Option<K>),
+    /// Reserves capacity for some number of additional elements in [`Values`]
+    /// for the given key. If the given key does not exist, allocate an empty
+    /// `Values` with the given capacity.
+    ///
+    /// This can improve performance by pre-allocating space for large bags of values.
+    Reserve(K, usize),
+    /// Mark the map as ready to be consumed for readers.
+    MarkReady,
+    /// Set the value of the map meta.
+    SetMeta(M),
+    /// Copy over the contents of the read map wholesale as the write map is empty.
+    JustCloneRHandle,
+}
+
+impl<K, V, M> fmt::Debug for Operation<K, V, M>
+where
+    K: fmt::Debug,
+    V: fmt::Debug,
+    M: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Operation::Replace(ref a, ref b) => f.debug_tuple("Replace").field(a).field(b).finish(),
+            Operation::Add(ref a, ref b) => f.debug_tuple("Add").field(a).field(b).finish(),
+            Operation::RemoveValue(ref a, ref b) => {
+                f.debug_tuple("RemoveValue").field(a).field(b).finish()
+            }
+            Operation::RemoveEntry(ref a) => f.debug_tuple("RemoveEntry").field(a).finish(),
+            #[cfg(feature = "eviction")]
+            Operation::EmptyAt(ref a) => f.debug_tuple("EmptyAt").field(a).finish(),
+            Operation::Clear(ref a) => f.debug_tuple("Clear").field(a).finish(),
+            Operation::Purge => f.debug_tuple("Purge").finish(),
+            Operation::Retain(ref a, ref b) => f.debug_tuple("Retain").field(a).field(b).finish(),
+            Operation::Fit(ref a) => f.debug_tuple("Fit").field(a).finish(),
+            Operation::Reserve(ref a, ref b) => f.debug_tuple("Reserve").field(a).field(b).finish(),
+            Operation::MarkReady => f.debug_tuple("MarkReady").finish(),
+            Operation::SetMeta(ref a) => f.debug_tuple("SetMeta").field(a).finish(),
+            Operation::JustCloneRHandle => f.debug_tuple("JustCloneRHandle").finish(),
+        }
+    }
+}
+
+/// Unary predicate used to retain elements.
+///
+/// The predicate function is called once for each distinct value, and `true` if this is the
+/// _first_ call to the predicate on the _second_ application of the operation.
+pub struct Predicate<V: ?Sized>(pub(crate) Box<dyn FnMut(&V, bool) -> bool + Send>);
+
+impl<V: ?Sized> Predicate<V> {
+    /// Evaluate the predicate for the given element
+    #[inline]
+    pub fn eval(&mut self, value: &V, reset: bool) -> bool {
+        (*self.0)(value, reset)
+    }
+}
+
+impl<V: ?Sized> PartialEq for Predicate<V> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        // only compare data, not vtable: https://stackoverflow.com/q/47489449/472927
+        &*self.0 as *const _ as *const () == &*other.0 as *const _ as *const ()
+    }
+}
+
+impl<V: ?Sized> Eq for Predicate<V> {}
+
+impl<V: ?Sized> fmt::Debug for Predicate<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Predicate")
+            .field(&format_args!("{:p}", &*self.0 as *const _))
+            .finish()
     }
 }

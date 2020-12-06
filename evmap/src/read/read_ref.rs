@@ -1,5 +1,5 @@
 use crate::values::ValuesInner;
-use crate::{inner::Inner, Aliased, Values};
+use crate::{inner::Inner, values::Values, Aliased};
 use left_right::ReadGuard;
 use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
