@@ -233,11 +233,13 @@ pub trait Absorb<O> {
     /// Drop the first of the two copies.
     ///
     /// Defaults to calling `Self::drop`.
+    #[allow(clippy::boxed_local)]
     fn drop_first(self: Box<Self>) {}
 
     /// Drop the second of the two copies.
     ///
     /// Defaults to calling `Self::drop`.
+    #[allow(clippy::boxed_local)]
     fn drop_second(self: Box<Self>) {}
 }
 

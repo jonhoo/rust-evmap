@@ -289,10 +289,6 @@ where
     fn eq(&self, other: &Self) -> bool {
         self.as_ref().eq(other.as_ref())
     }
-
-    fn ne(&self, other: &Self) -> bool {
-        self.as_ref().ne(other.as_ref())
-    }
 }
 
 impl<T, D> Eq for Aliased<T, D>
